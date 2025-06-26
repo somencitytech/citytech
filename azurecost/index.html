@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Azure Cost Dashboard – Monthly</title>
+  <title>Azure Cost Dashboard – Monthly View</title>
   <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
   <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
@@ -10,7 +10,7 @@
   <style>
     body { font-family: Arial; padding: 20px; background: #f5f5f5; }
     h2 { color: #0078d4; }
-    .months { margin: 20px 0; }
+    .months, .uploader { margin: 20px 0; padding: 10px; background: white; border: 1px solid #ccc; }
     .summary { margin: 20px 0; padding: 10px; background: #e7f3ff; border-left: 4px solid #0078d4; font-size: 16px; }
     table { width: 100%; background: white; }
   </style>
@@ -18,11 +18,23 @@
 <body>
   <h2>Azure Cost Dashboard – Monthly View</h2>
 
+  <!-- ✅ Month selection -->
   <div class="months">
-    <strong>Select Months:</strong><br>
+    <strong>Select Months to View Data:</strong><br>
     <label><input type="checkbox" class="month" value="May"> May</label>
     <label><input type="checkbox" class="month" value="June"> June</label>
-    <!-- Add more months if needed -->
+  </div>
+
+  <!-- ✅ File upload per month (simulated only) -->
+  <div class="uploader">
+    <strong>Upload CSV for a Month (Demo only – doesn't save):</strong><br>
+    <select id="uploadMonth">
+      <option value="May">May</option>
+      <option value="June">June</option>
+    </select>
+    <br><br>
+    <input type="file" id="csvUploader" accept=".csv" multiple>
+    <p><em>(Upload is simulated — saving to GitHub requires backend or blob storage)</em></p>
   </div>
 
   <div class="summary" id="costSummary">Total Cost: ₹0 | Total USD: $0</div>
@@ -41,13 +53,25 @@
 
   <script>
     const year = '2025';
-    const baseURL = 'https://<your-username>.github.io/<your-repo>/allcsv/' + year + '/';
+    const baseURL = 'https://somencitytech.github.io/citytech/azurecost/allcsv/' + year + '/';
+
+    async function fetchCSV(url) {
+      const response = await fetch(url);
+      const csvText = await response.text();
+      return new Promise((resolve) => {
+        Papa.parse(csvText, {
+          header: true,
+          skipEmptyLines: true,
+          complete: results => resolve(results.data)
+        });
+      });
+    }
 
     async function loadSelectedMonths() {
-      const selected = $('.month:checked').map(function () { return this.value; }).get();
+      const selectedMonths = $('.month:checked').map(function () { return this.value; }).get();
       let allData = [];
 
-      for (const month of selected) {
+      for (const month of selectedMonths) {
         const indexURL = `${baseURL}${month}/index.json`;
 
         try {
@@ -55,29 +79,21 @@
           const csvFiles = await indexResp.json();
 
           for (const file of csvFiles) {
-            const csvURL = `${baseURL}${month}/${encodeURIComponent(file)}`;
+            const fileURL = `${baseURL}${month}/${encodeURIComponent(file)}`;
             try {
-              const csvResp = await fetch(csvURL);
-              const csvText = await csvResp.text();
-
-              Papa.parse(csvText, {
-                header: true,
-                skipEmptyLines: true,
-                complete: result => {
-                  allData.push(...result.data);
-                  populateTable(allData);
-                  updateSummary(allData);
-                }
-              });
-            } catch (err) {
-              console.warn('CSV fetch failed:', file);
+              const csvData = await fetchCSV(fileURL);
+              allData.push(...csvData);
+            } catch {
+              console.warn('Could not load file:', fileURL);
             }
           }
-
-        } catch (err) {
-          console.warn('Missing index.json for month:', month);
+        } catch {
+          console.warn('Missing or bad index.json for:', month);
         }
       }
+
+      populateTable(allData);
+      updateSummary(allData);
     }
 
     function populateTable(data) {
@@ -104,6 +120,26 @@
         `<strong>Total Cost:</strong> ₹${totalINR.toFixed(2)} | <strong>Total USD:</strong> $${totalUSD.toFixed(2)}`
       );
     }
+
+    $('#csvUploader').on('change', async function () {
+      const files = Array.from(this.files);
+      const selectedMonth = $('#uploadMonth').val();
+      let uploadedData = [];
+
+      for (const file of files) {
+        const content = await file.text();
+        Papa.parse(content, {
+          header: true,
+          skipEmptyLines: true,
+          complete: result => {
+            uploadedData.push(...result.data);
+            populateTable(uploadedData);
+            updateSummary(uploadedData);
+            alert(`File "${file.name}" parsed and displayed for ${selectedMonth}.`);
+          }
+        });
+      }
+    });
 
     $(document).ready(function () {
       $('#costTable').DataTable();
