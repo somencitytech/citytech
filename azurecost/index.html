@@ -10,8 +10,9 @@
   <style>
     body { font-family: Arial; padding: 20px; background: #f5f5f5; }
     h2 { color: #0078d4; }
-    table { width: 100%; }
     .uploader { margin: 20px 0; padding: 20px; border: 2px dashed #ccc; background: white; text-align: center; }
+    .summary { margin: 20px 0; padding: 10px; background: #e7f3ff; border-left: 4px solid #0078d4; font-size: 16px; }
+    table { width: 100%; background: white; }
   </style>
 </head>
 <body>
@@ -19,7 +20,11 @@
 
   <div class="uploader">
     <input type="file" id="csvFiles" multiple accept=".csv">
-    <p>Select multiple CSV files</p>
+    <p>Select multiple CSV files to view combined cost data</p>
+  </div>
+
+  <div class="summary" id="costSummary">
+    Total Cost: ₹0 | Total USD: $0
   </div>
 
   <table id="costTable" class="display">
@@ -27,7 +32,6 @@
       <tr>
         <th>Resource Group</th>
         <th>Subscription Name</th>
-        <th>Subscription ID</th>
         <th>Cost</th>
         <th>Cost USD</th>
       </tr>
@@ -59,6 +63,7 @@
       }
 
       populateTable(allData);
+      updateSummary(allData);
     });
 
     function populateTable(data) {
@@ -67,15 +72,29 @@
 
       data.forEach(row => {
         table.row.add([
-          row.ResourceGroup,
-          row.SubscriptionName,
-          row.SubscriptionId,
+          row.ResourceGroup || '',
+          row.SubscriptionName || '',
           parseFloat(row.Cost || 0).toFixed(2),
           parseFloat(row.CostUSD || 0).toFixed(2)
         ]);
       });
 
       table.draw();
+    }
+
+    function updateSummary(data) {
+      let totalINR = 0;
+      let totalUSD = 0;
+
+      data.forEach(row => {
+        totalINR += parseFloat(row.Cost || 0);
+        totalUSD += parseFloat(row.CostUSD || 0);
+      });
+
+      document.getElementById('costSummary').innerHTML = `
+        <strong>Total Cost:</strong> ₹${totalINR.toFixed(2)} | 
+        <strong>Total USD:</strong> $${totalUSD.toFixed(2)}
+      `;
     }
 
     $(document).ready(function () {
