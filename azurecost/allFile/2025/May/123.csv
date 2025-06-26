@@ -1,0 +1,2 @@
+ResourceGroup,ResourceGroupId,SubscriptionName,SubscriptionId,Cost,CostUSD,Currency
+crmdemo,/subscriptions/9e920b83-45d9-489f-b874-58e947a40b63/resourcegroups/crmdemo,Visual Studio Enterprise Subscription – CRM -10.90 K Budget,9e920b83-45d9-489f-b874-58e947a40b63,10821.6299,126.9411492,INR
