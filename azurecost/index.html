@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Azure Cost Dashboard by Resource Group</title>
+  <title>Azure Cost Dashboard by Month</title>
   <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
   <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
@@ -10,22 +10,25 @@
   <style>
     body { font-family: Arial; padding: 20px; background: #f5f5f5; }
     h2 { color: #0078d4; }
-    .uploader { margin: 20px 0; padding: 20px; border: 2px dashed #ccc; background: white; text-align: center; }
+    .months { margin: 20px 0; }
     .summary { margin: 20px 0; padding: 10px; background: #e7f3ff; border-left: 4px solid #0078d4; font-size: 16px; }
     table { width: 100%; background: white; }
   </style>
 </head>
 <body>
-  <h2>Azure Cost Dashboard – Resource Group Wise</h2>
+  <h2>Azure Cost Dashboard – Monthly View</h2>
 
-  <div class="uploader">
-    <input type="file" id="csvFiles" multiple accept=".csv">
-    <p>Select multiple CSV files to view combined cost data</p>
+  <div class="months">
+    <strong>Select Months:</strong><br>
+    <label><input type="checkbox" class="month" value="January"> January</label>
+    <label><input type="checkbox" class="month" value="February"> February</label>
+    <label><input type="checkbox" class="month" value="March"> March</label>
+    <label><input type="checkbox" class="month" value="April"> April</label>
+    <label><input type="checkbox" class="month" value="May"> May</label>
+    <label><input type="checkbox" class="month" value="June"> June</label>
   </div>
 
-  <div class="summary" id="costSummary">
-    Total Cost: ₹0 | Total USD: $0
-  </div>
+  <div class="summary" id="costSummary">Total Cost: ₹0 | Total USD: $0</div>
 
   <table id="costTable" class="display">
     <thead>
@@ -40,36 +43,53 @@
   </table>
 
   <script>
-    let allData = [];
+    const year = '2025';
+    const basePath = 'https://<your-username>.github.io/<repo-name>/allcsv/' + year + '/';
+    const fileList = {
+      'January': ['cost1.csv', 'cost2.csv'],
+      'February': ['cost1.csv'],
+      'March': ['cost1.csv'],
+      'April': ['cost1.csv'],
+      'May': ['cost1.csv', 'cost2.csv'],
+      'June': ['cost1.csv']
+    };
 
-    function parseCSV(file) {
-      return new Promise((resolve, reject) => {
-        Papa.parse(file, {
+    async function fetchCSV(url) {
+      const response = await fetch(url);
+      const csvText = await response.text();
+      return new Promise((resolve) => {
+        Papa.parse(csvText, {
           header: true,
           skipEmptyLines: true,
-          complete: results => resolve(results.data),
-          error: err => reject(err)
+          complete: results => resolve(results.data)
         });
       });
     }
 
-    $('#csvFiles').on('change', async function (e) {
-      const files = Array.from(e.target.files);
-      allData = [];
+    async function loadSelectedMonths() {
+      const selectedMonths = $('.month:checked').map(function () { return this.value; }).get();
+      let allData = [];
 
-      for (const file of files) {
-        const data = await parseCSV(file);
-        allData.push(...data);
+      for (const month of selectedMonths) {
+        const files = fileList[month] || [];
+        for (const file of files) {
+          const url = basePath + month + '/' + file;
+          try {
+            const data = await fetchCSV(url);
+            allData.push(...data);
+          } catch (e) {
+            console.warn('Failed to load:', url);
+          }
+        }
       }
 
       populateTable(allData);
       updateSummary(allData);
-    });
+    }
 
     function populateTable(data) {
       const table = $('#costTable').DataTable();
       table.clear();
-
       data.forEach(row => {
         table.row.add([
           row.ResourceGroup || '',
@@ -78,27 +98,23 @@
           parseFloat(row.CostUSD || 0).toFixed(2)
         ]);
       });
-
       table.draw();
     }
 
     function updateSummary(data) {
-      let totalINR = 0;
-      let totalUSD = 0;
-
+      let totalINR = 0, totalUSD = 0;
       data.forEach(row => {
         totalINR += parseFloat(row.Cost || 0);
         totalUSD += parseFloat(row.CostUSD || 0);
       });
-
-      document.getElementById('costSummary').innerHTML = `
-        <strong>Total Cost:</strong> ₹${totalINR.toFixed(2)} | 
-        <strong>Total USD:</strong> $${totalUSD.toFixed(2)}
-      `;
+      $('#costSummary').html(
+        `<strong>Total Cost:</strong> ₹${totalINR.toFixed(2)} | <strong>Total USD:</strong> $${totalUSD.toFixed(2)}`
+      );
     }
 
     $(document).ready(function () {
       $('#costTable').DataTable();
+      $('.month').on('change', loadSelectedMonths);
     });
   </script>
 </body>
