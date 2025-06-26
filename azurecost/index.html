@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Azure Cost Dashboard by Month</title>
+  <title>Azure Cost Dashboard – Monthly</title>
   <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
   <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
@@ -20,12 +20,9 @@
 
   <div class="months">
     <strong>Select Months:</strong><br>
-    <label><input type="checkbox" class="month" value="January"> January</label>
-    <label><input type="checkbox" class="month" value="February"> February</label>
-    <label><input type="checkbox" class="month" value="March"> March</label>
-    <label><input type="checkbox" class="month" value="April"> April</label>
     <label><input type="checkbox" class="month" value="May"> May</label>
     <label><input type="checkbox" class="month" value="June"> June</label>
+    <!-- Add more months if needed -->
   </div>
 
   <div class="summary" id="costSummary">Total Cost: ₹0 | Total USD: $0</div>
@@ -44,47 +41,43 @@
 
   <script>
     const year = '2025';
-    const basePath = 'https://<your-username>.github.io/<repo-name>/allcsv/' + year + '/';
-    const fileList = {
-      'January': ['cost1.csv', 'cost2.csv'],
-      'February': ['cost1.csv'],
-      'March': ['cost1.csv'],
-      'April': ['cost1.csv'],
-      'May': ['cost1.csv', 'cost2.csv'],
-      'June': ['cost1.csv']
-    };
-
-    async function fetchCSV(url) {
-      const response = await fetch(url);
-      const csvText = await response.text();
-      return new Promise((resolve) => {
-        Papa.parse(csvText, {
-          header: true,
-          skipEmptyLines: true,
-          complete: results => resolve(results.data)
-        });
-      });
-    }
+    const baseURL = 'https://<your-username>.github.io/<your-repo>/allcsv/' + year + '/';
 
     async function loadSelectedMonths() {
-      const selectedMonths = $('.month:checked').map(function () { return this.value; }).get();
+      const selected = $('.month:checked').map(function () { return this.value; }).get();
       let allData = [];
 
-      for (const month of selectedMonths) {
-        const files = fileList[month] || [];
-        for (const file of files) {
-          const url = basePath + month + '/' + file;
-          try {
-            const data = await fetchCSV(url);
-            allData.push(...data);
-          } catch (e) {
-            console.warn('Failed to load:', url);
+      for (const month of selected) {
+        const indexURL = `${baseURL}${month}/index.json`;
+
+        try {
+          const indexResp = await fetch(indexURL);
+          const csvFiles = await indexResp.json();
+
+          for (const file of csvFiles) {
+            const csvURL = `${baseURL}${month}/${encodeURIComponent(file)}`;
+            try {
+              const csvResp = await fetch(csvURL);
+              const csvText = await csvResp.text();
+
+              Papa.parse(csvText, {
+                header: true,
+                skipEmptyLines: true,
+                complete: result => {
+                  allData.push(...result.data);
+                  populateTable(allData);
+                  updateSummary(allData);
+                }
+              });
+            } catch (err) {
+              console.warn('CSV fetch failed:', file);
+            }
           }
+
+        } catch (err) {
+          console.warn('Missing index.json for month:', month);
         }
       }
-
-      populateTable(allData);
-      updateSummary(allData);
     }
 
     function populateTable(data) {
